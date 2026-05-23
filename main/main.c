@@ -17,6 +17,7 @@
 #include "freertos/task.h"
 #include "esp_log.h"
 #include "nvs_flash.h"
+#include "nvs.h"
 #include "driver/gpio.h"
 #include "driver/rmt_tx.h"
 #include "driver/rmt_encoder.h"
@@ -68,6 +69,42 @@ static int  central_gap_event(struct ble_gap_event *event, void *arg);
 static int  peripheral_gap_event(struct ble_gap_event *event, void *arg);
 static void disconnect_and_rescan(void);
 static void update_device_name(const char *hrm_name);
+
+/* ========================================================================
+ * NVS — persist last connected sensor - NVS in flash
+ * ======================================================================== */
+
+#define NVS_NAMESPACE "hrm_cfg"
+
+static void nvs_save_target(void)
+{
+    nvs_handle_t h;
+    if (nvs_open(NVS_NAMESPACE, NVS_READWRITE, &h) == ESP_OK) {
+        nvs_set_i32(h, "target_idx", current_target_idx);
+        nvs_set_u8(h, "dyn_mode", dynamic_pair_mode ? 1 : 0);
+        nvs_commit(h);
+        nvs_close(h);
+    }
+}
+
+static void nvs_load_target(void)
+{
+    nvs_handle_t h;
+    if (nvs_open(NVS_NAMESPACE, NVS_READONLY, &h) == ESP_OK) {
+        int32_t idx = 0;
+        uint8_t dyn = 0;
+        nvs_get_i32(h, "target_idx", &idx);
+        nvs_get_u8(h, "dyn_mode", &dyn);
+        nvs_close(h);
+
+        if (idx >= 0 && idx < (int)NUM_HRM_TARGETS) {
+            current_target_idx = idx;
+        }
+        dynamic_pair_mode = (dyn != 0);
+        ESP_LOGI(TAG, "NVS loaded: target[%d]='%s' dynamic=%d",
+                 current_target_idx, hrm_targets[current_target_idx], dynamic_pair_mode);
+    }
+}
 
 /* ---- LED state ---- */
 typedef enum {
@@ -230,6 +267,7 @@ static void button_task(void *param)
                     update_device_name(hrm_targets[current_target_idx]);
                 }
                 disconnect_and_rescan();
+                nvs_save_target();
             } else if (duration_ms > 50) {
                 /* Short press → cycle to next predefined target */
                 dynamic_pair_mode = false;
@@ -239,6 +277,7 @@ static void button_task(void *param)
                          hrm_targets[current_target_idx]);
                 update_device_name(hrm_targets[current_target_idx]);
                 disconnect_and_rescan();
+                nvs_save_target();
             }
         }
 
@@ -675,6 +714,9 @@ void app_main(void)
         ret = nvs_flash_init();
     }
     ESP_ERROR_CHECK(ret);
+
+    /* Load last used target from flash */
+    nvs_load_target();
 
     ret = nimble_port_init();
     if (ret != ESP_OK) {
