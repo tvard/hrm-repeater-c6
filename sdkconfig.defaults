@@ -33,3 +33,7 @@ CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ=80
 CONFIG_FREERTOS_USE_TICKLESS_IDLE=y
 CONFIG_PM_ENABLE=y
 CONFIG_BT_NIMBLE_SLEEP_ENABLE=y
+
+# TX power: set to maximum (+20 dBm) — NimBLE-native way (no Bluedroid API needed)
+# Power budget is fine: ~60mA avg on 5000mAh bank = 80+ hours; 3-4h uses <5%
+CONFIG_BT_LE_PWR_LVL_P20=y

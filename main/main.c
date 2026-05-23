@@ -21,7 +21,6 @@
 #include "driver/gpio.h"
 #include "driver/rmt_tx.h"
 #include "driver/rmt_encoder.h"
-#include "esp_bt.h"
 #include "nimble/nimble_port.h"
 #include "nimble/nimble_port_freertos.h"
 #include "host/ble_hs.h"
@@ -725,14 +724,6 @@ void app_main(void)
 
     /* Load last used target from flash */
     nvs_load_target();
-
-    /* Set BLE TX power to maximum (+20 dBm) for both advertising and scanning.
-     * Power budget: ~60 mA avg on a 5000 mAh bank ≈ 80+ hours; 3-4h sessions
-     * use <5% of capacity, so dynamic power control is unnecessary. */
-    esp_ble_tx_power_set(ESP_BLE_PWR_TYPE_DEFAULT, ESP_PWR_LVL_P20);
-    esp_ble_tx_power_set(ESP_BLE_PWR_TYPE_ADV,     ESP_PWR_LVL_P20);
-    esp_ble_tx_power_set(ESP_BLE_PWR_TYPE_SCAN,    ESP_PWR_LVL_P20);
-    ESP_LOGI(TAG, "BLE TX power set to +20 dBm (max)");
 
     ret = nimble_port_init();
     if (ret != ESP_OK) {
