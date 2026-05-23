@@ -24,7 +24,8 @@
 static const char *TAG = "HRM_REPEATER";
 
 /* ---- Configuration ---- */
-#define TARGET_HRM_NAME    "H808S"       /* Substring to match in advertised name */
+// #define TARGET_HRM_NAME    "H808S"       /* COOSPLO*/
+#define TARGET_HRM_NAME    "16821-49"       /* MAGENE */
 #define DEVICE_NAME        "ESP-HRM"     /* Name we advertise as */
 
 /* ---- BLE UUIDs ---- */
