@@ -28,6 +28,7 @@
 #include "host/util/util.h"
 #include "services/gap/ble_svc_gap.h"
 #include "services/gatt/ble_svc_gatt.h"
+#include "services/dis/ble_svc_dis.h"
 
 static const char *TAG = "HRM_REPEATER";
 
@@ -179,35 +180,37 @@ static void led_task(void *param)
         switch (led_state) {
         case LED_UNPAIRED:
             /* Fast blink RED: 100ms on, 100ms off */
-            led_set_color(20, 0, 0);
+            led_set_color(15, 0, 0);
             vTaskDelay(pdMS_TO_TICKS(100));
             led_off();
             vTaskDelay(pdMS_TO_TICKS(100));
             break;
 
         case LED_SENSOR_ONLY:
-            /* Slow blink BLUE: 500ms on, 500ms off */
-            led_set_color(0, 0, 20);
-            vTaskDelay(pdMS_TO_TICKS(500));
+            /* Slow blink BLUE: 200ms on, 1800ms off (low duty cycle) */
+            led_set_color(0, 0, 15);
+            vTaskDelay(pdMS_TO_TICKS(200));
             led_off();
-            vTaskDelay(pdMS_TO_TICKS(500));
+            vTaskDelay(pdMS_TO_TICKS(1800));
             break;
 
         case LED_FULLY_CONNECTED:
-            /* Solid GREEN */
-            led_set_color(0, 20, 0);
+            /* Single dim green pulse every 3s — barely visible, very low power */
+            led_set_color(0, 8, 0);
             vTaskDelay(pdMS_TO_TICKS(200));
+            led_off();
+            vTaskDelay(pdMS_TO_TICKS(2800));
             break;
 
         case LED_ERROR:
             /* Triple flash YELLOW */
             for (int i = 0; i < 3; i++) {
-                led_set_color(20, 10, 0);
+                led_set_color(15, 8, 0);
                 vTaskDelay(pdMS_TO_TICKS(80));
                 led_off();
                 vTaskDelay(pdMS_TO_TICKS(80));
             }
-            vTaskDelay(pdMS_TO_TICKS(500));
+            vTaskDelay(pdMS_TO_TICKS(700));
             break;
         }
     }
@@ -461,10 +464,14 @@ static void start_scan(void)
 
     struct ble_gap_disc_params params;
     memset(&params, 0, sizeof(params));
-    params.passive = 0;            /* Active scan to get names */
+    /* Passive scan in preset mode (we know the name, no need to send scan requests).
+     * Active scan in dynamic mode to fetch names from scan response packets. */
+    params.passive = dynamic_pair_mode ? 0 : 1;
     params.filter_duplicates = 1;
-    params.itvl = 0x0050;
-    params.window = 0x0030;
+    /* Low duty cycle: scan 11.25ms every 90ms (~12.5%) to save power.
+     * Units are 0.625ms ticks: itvl=144 (90ms), window=18 (11.25ms) */
+    params.itvl = 144;
+    params.window = 18;
 
     int rc = ble_gap_disc(BLE_OWN_ADDR_PUBLIC, BLE_HS_FOREVER, &params,
                           central_gap_event, NULL);
@@ -735,6 +742,15 @@ void app_main(void)
     /* Initialize services */
     ble_svc_gap_init();
     ble_svc_gatt_init();
+
+    /* Device Information Service (DIS) — shown in apps like Wahoo */
+    ble_svc_dis_init();
+    ble_svc_dis_manufacturer_name_set("ESP32-C6");
+    ble_svc_dis_model_number_set("HRM-Repeater");
+    ble_svc_dis_serial_number_set("1");
+    ble_svc_dis_firmware_revision_set("1.0.0");
+    ble_svc_dis_hardware_revision_set("ESP32-C6-DevKitM-1");
+    ble_svc_dis_software_revision_set("NimBLE");
 
     /* Register our HRM GATT service */
     int rc = ble_gatts_count_cfg(gatt_services);
