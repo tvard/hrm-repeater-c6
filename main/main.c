@@ -176,42 +176,61 @@ static void led_task(void *param)
 {
     led_strip_init();
 
+    const TickType_t keepalive_interval = pdMS_TO_TICKS(15000); // 15s interval
+    const TickType_t keepalive_pulse = pdMS_TO_TICKS(150);      // 150ms pulse
+    TickType_t last_keepalive = xTaskGetTickCount();
+
     while (1) {
-        switch (led_state) {
-        case LED_UNPAIRED:
-            /* Fast blink RED: 100ms on, 100ms off */
-            led_set_color(15, 0, 0);
-            vTaskDelay(pdMS_TO_TICKS(100));
-            led_off();
-            vTaskDelay(pdMS_TO_TICKS(100));
-            break;
+        TickType_t now = xTaskGetTickCount();
+        bool did_keepalive = false;
 
-        case LED_SENSOR_ONLY:
-            /* Slow blink BLUE: 200ms on, 1800ms off (low duty cycle) */
-            led_set_color(0, 0, 15);
-            vTaskDelay(pdMS_TO_TICKS(200));
+        // Check if it's time for a keep-alive pulse
+        if ((now - last_keepalive) >= keepalive_interval) {
+            // Full-brightness white pulse for max current
+            led_set_color(32, 32, 32);
+            vTaskDelay(keepalive_pulse);
             led_off();
-            vTaskDelay(pdMS_TO_TICKS(1800));
-            break;
+            last_keepalive = xTaskGetTickCount();
+            did_keepalive = true;
+        }
 
-        case LED_FULLY_CONNECTED:
-            /* Single dim green pulse every 3s — barely visible, very low power */
-            led_set_color(0, 8, 0);
-            vTaskDelay(pdMS_TO_TICKS(200));
-            led_off();
-            vTaskDelay(pdMS_TO_TICKS(2800));
-            break;
-
-        case LED_ERROR:
-            /* Triple flash YELLOW */
-            for (int i = 0; i < 3; i++) {
-                led_set_color(15, 8, 0);
-                vTaskDelay(pdMS_TO_TICKS(80));
+        if (!did_keepalive) {
+            switch (led_state) {
+            case LED_UNPAIRED:
+                /* Fast blink RED: 100ms on, 100ms off */
+                led_set_color(15, 0, 0);
+                vTaskDelay(pdMS_TO_TICKS(100));
                 led_off();
-                vTaskDelay(pdMS_TO_TICKS(80));
+                vTaskDelay(pdMS_TO_TICKS(100));
+                break;
+
+            case LED_SENSOR_ONLY:
+                /* Slow blink BLUE: 200ms on, 1800ms off (low duty cycle) */
+                led_set_color(0, 0, 15);
+                vTaskDelay(pdMS_TO_TICKS(200));
+                led_off();
+                vTaskDelay(pdMS_TO_TICKS(1800));
+                break;
+
+            case LED_FULLY_CONNECTED:
+                /* Single dim green pulse every 3s — barely visible, very low power */
+                led_set_color(0, 8, 0);
+                vTaskDelay(pdMS_TO_TICKS(200));
+                led_off();
+                vTaskDelay(pdMS_TO_TICKS(2800));
+                break;
+
+            case LED_ERROR:
+                /* Triple flash YELLOW */
+                for (int i = 0; i < 3; i++) {
+                    led_set_color(15, 8, 0);
+                    vTaskDelay(pdMS_TO_TICKS(80));
+                    led_off();
+                    vTaskDelay(pdMS_TO_TICKS(80));
+                }
+                vTaskDelay(pdMS_TO_TICKS(700));
+                break;
             }
-            vTaskDelay(pdMS_TO_TICKS(700));
-            break;
         }
     }
 }
